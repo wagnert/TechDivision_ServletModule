@@ -13,6 +13,8 @@
     "require": {
         "php" : ">=5.4.0",
         "techdivision/http": "dev-master",
+        "techdivision/stream": "dev-master",
+        "techdivision/socket": "dev-master",
         "techdivision/webserver": "dev-master",
         "techdivision/appserver": "dev-master",
         "techdivision/webcontainer": "dev-master",
