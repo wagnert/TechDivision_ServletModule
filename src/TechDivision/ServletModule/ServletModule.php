@@ -24,6 +24,7 @@ namespace TechDivision\ServletModule;
 use TechDivision\Http\HttpRequestInterface;
 use TechDivision\Http\HttpResponseInterface;
 use TechDivision\WebServer\Interfaces\ModuleInterface;
+use TechDivision\WebServer\Interfaces\ServerContextInterface;
 use TechDivision\WebServer\Modules\ModuleException;
 use TechDivision\ServletEngine\Engine;
 
@@ -37,8 +38,35 @@ use TechDivision\ServletEngine\Engine;
  * @license   http://opensource.org/licenses/osl-3.0.php Open Software License (OSL 3.0)
  * @link      http://www.appserver.io
  */
-class ServletModule extends ModuleInterface
+class ServletModule implements ModuleInterface
 {
+    
+    /**
+     * The unique module name in the web server context.
+     * 
+     * @var string
+     */
+    const MODULE_NAME = 'servlet';
+
+    /**
+     * Returns an array of module names which should be executed first.
+     *
+     * @return array The array of module names
+     */
+    public function getDependencies()
+    {
+        return array();
+    }
+
+    /**
+     * Returns the module name.
+     *
+     * @return string The module name
+     */
+    public function getModuleName()
+    {
+        return ServletModule::MODULE_NAME;
+    }
 
     /**
      * Initializes the module.
