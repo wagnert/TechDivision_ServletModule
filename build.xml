@@ -48,7 +48,7 @@
 	<target name="deploy" description="Copies the sources to the deploy directory.">				
 		<antcall target="prepare"/>
 		<antcall target="copy"/>
-		<copy todir="${dir.www}/${deploy.dir}/app/code" preservelastmodified="true" overwrite="true">
+		<copy todir="${deploy.dir}/app/code" preservelastmodified="true" overwrite="true">
 			<fileset dir="${php-target.dir}">
 				<include name="**/*"/>
 			</fileset>
