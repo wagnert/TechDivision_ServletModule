@@ -136,7 +136,7 @@ class ServletModule implements ModuleInterface
             // make server context local
             $serverContext = $this->getServerContext();
             
-            // check if we are the handler that has to process this request 
+            // check if we are the handler that has to process this request
             if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
                 return;
             }
