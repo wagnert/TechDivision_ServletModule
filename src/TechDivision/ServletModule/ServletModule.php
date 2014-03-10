@@ -170,11 +170,6 @@ class ServletModule implements ModuleInterface
                     // explode the data and create a cookie instance
                     list ($name, $value) = explode('=', $cookieHeader);
                     $servletRequest->addCookie(new Cookie($name, $value));
-                    
-                    // check if the default session cookie has been found
-                    if ($name === Session::SESSION_NAME) { // if yes, set the session ID
-                        $servletRequest->setRequestedSessionId($value);
-                    }
                 }
             }
             
