@@ -225,6 +225,9 @@ class ServletModule implements ModuleInterface
             // add the content of the servlet response back to the Http response
             $response->appendBodyStream($process->getResponse()->getBodyStream());
             
+            // set the response status code
+            $response->setStatusCode($process->getResponse()->getStatusCode());
+            
             // add the headers of the servlet response back to the Http response
             foreach ($process->getResponse()->getHeaders() as $name => $value) {
                 $response->addHeader($name, $value);
