@@ -19,6 +19,7 @@
         "techdivision/appserver": "dev-master",
         "techdivision/webcontainer": "dev-master",
         "techdivision/servlet": "dev-master",
+        "techdivision/storage": "dev-master",
         "techdivision/servletengine": "dev-master"
     },
     "autoload": {
