@@ -27,10 +27,11 @@ use TechDivision\Http\HttpResponseInterface;
 use TechDivision\Storage\StackableStorage;
 use TechDivision\Servlet\Http\Cookie;
 use TechDivision\ServletEngine\Engine;
+use TechDivision\ServletEngine\Application;
 use TechDivision\ServletEngine\VirtualHost;
+use TechDivision\ServletEngine\ServletDeployment;
 use TechDivision\ServletEngine\DefaultSessionSettings;
 use TechDivision\ServletEngine\StandardSessionManager;
-use TechDivision\ServletEngine\WebContainerDeployment;
 use TechDivision\ServletEngine\Http\Session;
 use TechDivision\ServletEngine\Http\Request;
 use TechDivision\ServletEngine\Http\Response;
@@ -39,6 +40,9 @@ use TechDivision\WebServer\Dictionaries\ServerVars;
 use TechDivision\WebServer\Interfaces\ModuleInterface;
 use TechDivision\WebServer\Interfaces\ServerContextInterface;
 use TechDivision\WebServer\Exceptions\ModuleException;
+use TechDivision\ApplicationServer\Api\AppService;
+use TechDivision\ApplicationServer\Api\ContainerService;
+use TechDivision\ApplicationServer\Api\Node\AppNode;
 
 /**
  * This is a servlet module that handles a servlet request.
@@ -299,7 +303,29 @@ class ServletModule implements ModuleInterface
      */
     protected function getApplications()
     {
-        return $this->getDeployment()->deploy()->getApplications();
+
+        // create a new API app service instance
+        $appService = $this->getAppService();
+        
+        // load the initialized applications
+        $applications = $this->getDeployment()->deploy()->getApplications();
+        
+        // iterate over the applications and register them in the system configuration
+        foreach ($applications as $application) {
+            
+            // check if the application has already been registered
+            $appNode = $appService->loadByWebappPath($application->getWebappPath());
+        
+            // check if the app has already been attached to the container
+            if ($appNode == null) { // if not, create a new node and attach it
+                $appNode = $appService->create($application);
+                $appNode->setParentUuid($this->getContainerNode()->getParentUuid());
+                $appService->persist($appNode);
+            }
+        }
+        
+        // return the applications
+        return $applications;
     }
     
     /**
@@ -308,7 +334,7 @@ class ServletModule implements ModuleInterface
      * 
      * @return array The array with the virtual host configuration
      */
-    protected function getVirtualHosts()
+    protected function getVHosts()
     {
             
         // initialize the array with the servlet engines virtual hosts
@@ -316,7 +342,7 @@ class ServletModule implements ModuleInterface
 
         // load the document root and the web servers virtual host configuration
         $documentRoot = $this->getDocumentRoot();
-        $virtualHosts = $this->getServerContext()->getServerConfig()->getVirtualHosts();
+        $virtualHosts = $this->getVirtualHosts();
         
         // prepare the virtual host configurations
         foreach ($virtualHosts as $domain => $virtualHost) {
@@ -331,6 +357,18 @@ class ServletModule implements ModuleInterface
         // return the array with the servlet engines virtual hosts
         return $vhosts;
     }
+
+    /**
+     * Returns the web servers base directory.
+     *
+     * @param string|null $directoryToAppend Append this directory to the base directory before returning it
+     *
+     * @return string The base directory
+     */
+    protected function getBaseDirectory($directoryToAppend = null)
+    {
+        return $this->getContainerService()->getBaseDirectory($directoryToAppend);
+    }
     
     /**
      * Returns the servers document root.
@@ -343,6 +381,16 @@ class ServletModule implements ModuleInterface
     }
 
     /**
+     * Returns the path, relative to the base directory, containing the web applications.
+     *
+     * @return string The path, relative to the base directory, containing the web applications.
+     */
+    protected function getAppBase()
+    {
+        return str_replace($this->getBaseDirectory(), '', $this->getDocumentRoot());
+    }
+
+    /**
      * Returns the deployment instance for the container for
      * this container thread.
      *
@@ -352,12 +400,34 @@ class ServletModule implements ModuleInterface
     {
 
         // initialize the servlet engine deployment
-        $deployment = new WebContainerDeployment($this->getInitialContext(), $this->getContainerNode());
-        $deployment->injectDocumentRoot($this->getDocumentRoot());
-        $deployment->injectVirtualHosts($this->getVirtualHosts());
+        $deployment = new ServletDeployment();
+        $deployment->injectInitialContext($this->getInitialContext());
+        $deployment->injectVirtualHosts($this->getVHosts());
+        $deployment->injectBaseDirectory($this->getBaseDirectory());
+        $deployment->injectAppBase($this->getAppBase());
         
         // return the initialized deployment instance
         return $deployment;
+    }
+    
+    /**
+     * Returns the web servers virtual host configuration as array.
+     * 
+     * @return array The web servers virtual host configuration
+     */
+    protected function getVirtualHosts()
+    {
+        return $this->getServerContext()->getServerConfig()->getVirtualHosts();
+    }
+    
+    /**
+     * Returns the app service.
+     * 
+     * @return \TechDivision\ApplicationServer\Api\AppService The app service instance
+     */
+    protected function getAppService()
+    {
+        return new AppService($this->getInitialContext());
     }
 
     /**
@@ -378,6 +448,16 @@ class ServletModule implements ModuleInterface
     protected function getContainerNode()
     {
         return $this->getContainer()->getContainerNode();
+    }
+    
+    /**
+     * Returns the container service.
+     * 
+     * @return \TechDivision\ApplicationServer\Api\ContainerService The container service instance
+     */
+    protected function getContainerService()
+    {
+        return new ContainerService($this->getInitialContext());
     }
 
     /**
