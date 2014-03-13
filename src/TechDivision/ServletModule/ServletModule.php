@@ -27,9 +27,10 @@ use TechDivision\Http\HttpResponseInterface;
 use TechDivision\Storage\StackableStorage;
 use TechDivision\Servlet\Http\Cookie;
 use TechDivision\ServletEngine\Engine;
-use TechDivision\ServletEngine\Deployment;
+use TechDivision\ServletEngine\VirtualHost;
 use TechDivision\ServletEngine\DefaultSessionSettings;
 use TechDivision\ServletEngine\StandardSessionManager;
+use TechDivision\ServletEngine\WebContainerDeployment;
 use TechDivision\ServletEngine\Http\Session;
 use TechDivision\ServletEngine\Http\Request;
 use TechDivision\ServletEngine\Http\Response;
@@ -110,8 +111,8 @@ class ServletModule implements ModuleInterface
             
             // initialize the engine
             $this->engine = new Engine();
-            $this->engine->injectContainer($this->getServerContext()->getContainer());
-            $this->engine->injectApplications($this->getDeployment()->deploy()->getApplications());
+            $this->engine->injectContainer($this->getContainer());
+            $this->engine->injectApplications($this->getApplications());
             $this->engine->injectManager($this->getManager());
             $this->engine->init();
             
@@ -184,13 +185,20 @@ class ServletModule implements ModuleInterface
                 // bingo we found a (again: almost virtual) servlet file
                 if (array_key_exists(".$extension", $handlers) && $handlers[".$extension"] === $this->getModuleName()) {
                     
+                    // prepare the servlet path
+                    if ($dirname === '/') {
+                        $servletPath = DIRECTORY_SEPARATOR . $basename;
+                    } else {
+                        $servletPath = $dirname . DIRECTORY_SEPARATOR . $basename;
+                    }
+                    
                     // we set the basename, because this is the servlet path
-                    $servletRequest->setServletPath($dirname . DIRECTORY_SEPARATOR . $basename);
-        
+                    $servletRequest->setServletPath($servletPath);
+                    
                     // we set the path info, what is the request URI with stripped dir- and basename
                     $servletRequest->setPathInfo(
-                        str_replace(
-                            $dirname . DIRECTORY_SEPARATOR . $basename,
+                        $pathInfo = str_replace(
+                            $servletPath,
                             '',
                             $uriWithoutQueryString
                         )
@@ -203,7 +211,7 @@ class ServletModule implements ModuleInterface
                 // descendent down the directory tree
                 list ($dirname, $basename, $extension) = array_values(pathinfo($dirname));
             
-            } while ($dirname !== '/'); // stop until we reached the root of the URI
+            } while ($dirname !== false); // stop until we reached the root of the URI
             
             // initialize the servlet response with the Http response values
             $servletResponse = new Response();
@@ -285,14 +293,71 @@ class ServletModule implements ModuleInterface
     }
 
     /**
-     * Returns the deployment interface for the container for
+     * Returns the deployed application instances.
+     *
+     * @return array The deployed application instances
+     */
+    protected function getApplications()
+    {
+        return $this->getDeployment()->deploy()->getApplications();
+    }
+    
+    /**
+     * Returns the array with the virtual host configuration for the
+     * servlet engine.
+     * 
+     * @return array The array with the virtual host configuration
+     */
+    protected function getVirtualHosts()
+    {
+            
+        // initialize the array with the servlet engines virtual hosts
+        $vhosts = array();
+
+        // load the document root and the web servers virtual host configuration
+        $documentRoot = $this->getDocumentRoot();
+        $virtualHosts = $this->getServerContext()->getServerConfig()->getVirtualHosts();
+        
+        // prepare the virtual host configurations
+        foreach ($virtualHosts as $domain => $virtualHost) {
+            
+            // prepare the applications base directory
+            $appBase = str_replace($documentRoot, '', $virtualHost['documentRoot']);
+            
+            // append the virtual host to the array
+            $vhosts[] = new VirtualHost($domain, $appBase);
+        }
+        
+        // return the array with the servlet engines virtual hosts
+        return $vhosts;
+    }
+    
+    /**
+     * Returns the servers document root.
+     * 
+     * @return string The servers document root
+     */
+    protected function getDocumentRoot()
+    {
+        return $this->getServerContext()->getServerConfig()->getDocumentRoot();
+    }
+
+    /**
+     * Returns the deployment instance for the container for
      * this container thread.
      *
      * @return \TechDivision\ApplicationServer\Interfaces\DeploymentInterface The deployment instance for this container thread
      */
     protected function getDeployment()
     {
-        return new Deployment($this->getInitialContext(), $this->getContainerNode());
+
+        // initialize the servlet engine deployment
+        $deployment = new WebContainerDeployment($this->getInitialContext(), $this->getContainerNode());
+        $deployment->injectDocumentRoot($this->getDocumentRoot());
+        $deployment->injectVirtualHosts($this->getVirtualHosts());
+        
+        // return the initialized deployment instance
+        return $deployment;
     }
 
     /**
