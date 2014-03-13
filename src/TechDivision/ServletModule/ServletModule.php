@@ -156,7 +156,7 @@ class ServletModule implements ModuleInterface
             $servletRequest = new Request();
             
             // initialize the servlet request with the Http request values
-            $servletRequest->setDocumentRoot($request->getDocumentRoot());
+            $servletRequest->setDocumentRoot($serverContext->getServerVar(ServerVars::DOCUMENT_ROOT));
             $servletRequest->setHeaders($request->getHeaders());
             $servletRequest->setMethod($request->getMethod());
             $servletRequest->setParameterMap($request->getParams());
