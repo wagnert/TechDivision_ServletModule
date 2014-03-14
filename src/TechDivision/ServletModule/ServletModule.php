@@ -142,9 +142,6 @@ class ServletModule implements ModuleInterface
     {
         
         try {
-
-            // register a shutdown handler
-            register_shutdown_function(array(&$this, 'shutdown'));
     
             // start buffering the output
             ob_start();
