@@ -113,8 +113,12 @@ class ServletModule implements ModuleInterface
             // initialize the server context
             $this->serverContext = $serverContext;
             
+            // register the class loader instance
+            $this->getInitialContext()->getClassLoader()->register(true);
+            
             // initialize the engine
             $this->engine = new Engine();
+            
             $this->engine->injectContainer($this->getContainer());
             $this->engine->injectApplications($this->getApplications());
             $this->engine->injectManager($this->getManager());
@@ -123,17 +127,6 @@ class ServletModule implements ModuleInterface
         } catch (\Exception $e) {
             throw new ModuleException($e);
         }
-    }
-
-    /**
-     * Will be invoked when the instance will be shutdown, also 
-     * by a fatal error for example.
-     * 
-     * @return void
-     */
-    public function shutdown()
-    {
-        error_log(ob_get_clean());
     }
 
     /**
@@ -246,8 +239,7 @@ class ServletModule implements ModuleInterface
             $requestContext = new HttpRequestContext();
             $requestContext->injectServerVars($serverContext->getServerVars());
             $servletRequest->injectContext($requestContext);
-
-            $engine->registerClassLoader();
+            
             $engine->process($servletRequest, $servletResponse);
             
             // add the content of the servlet response back to the Http response
