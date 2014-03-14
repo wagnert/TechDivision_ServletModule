@@ -126,6 +126,17 @@ class ServletModule implements ModuleInterface
     }
 
     /**
+     * Will be invoked when the instance will be shutdown, also 
+     * by a fatal error for example.
+     * 
+     * @return void
+     */
+    public function shutdown()
+    {
+        error_log(ob_get_clean());
+    }
+
+    /**
      * Process the servlet engine.
      *
      * @param \TechDivision\Http\HttpRequestInterface  $request  The request instance
@@ -136,7 +147,14 @@ class ServletModule implements ModuleInterface
      */
     public function process(HttpRequestInterface $request, HttpResponseInterface $response)
     {
+        
         try {
+
+            // register a shutdown handler
+            register_shutdown_function(array(&$this, 'shutdown'));
+    
+            // start buffering the output
+            ob_start();
             
             // make server context local
             $serverContext = $this->getServerContext();
@@ -228,25 +246,23 @@ class ServletModule implements ModuleInterface
             $requestContext = new HttpRequestContext();
             $requestContext->injectServerVars($serverContext->getServerVars());
             $servletRequest->injectContext($requestContext);
-            
-            // process the servlet request in a separate thread
-            $process = new ServletProcess($engine, $servletRequest, $servletResponse);
-            $process->start(PTHREADS_INHERIT_ALL | PTHREADS_ALLOW_HEADERS);
-            $process->join();
+
+            $engine->registerClassLoader();
+            $engine->process($servletRequest, $servletResponse);
             
             // add the content of the servlet response back to the Http response
-            $response->appendBodyStream($process->getResponse()->getBodyStream());
+            $response->appendBodyStream($servletResponse->getBodyStream());
             
             // set the response status code
-            $response->setStatusCode($process->getResponse()->getStatusCode());
+            $response->setStatusCode($servletResponse->getStatusCode());
             
             // add the headers of the servlet response back to the Http response
-            foreach ($process->getResponse()->getHeaders() as $name => $value) {
+            foreach ($servletResponse->getHeaders() as $name => $value) {
                 $response->addHeader($name, $value);
             }
             
             // transform the servlet response cookies into Http headers
-            foreach ($process->getResponse()->getCookies() as $cookie) {
+            foreach ($servletResponse->getCookies() as $cookie) {
                 $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
             }
             
