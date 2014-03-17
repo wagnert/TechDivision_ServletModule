@@ -27,15 +27,17 @@ use TechDivision\Http\HttpResponseInterface;
 use TechDivision\Storage\StackableStorage;
 use TechDivision\Servlet\Http\Cookie;
 use TechDivision\ServletEngine\Engine;
-use TechDivision\ServletEngine\Application;
-use TechDivision\ServletEngine\VirtualHost;
-use TechDivision\ServletEngine\ServletDeployment;
 use TechDivision\ServletEngine\DefaultSessionSettings;
 use TechDivision\ServletEngine\StandardSessionManager;
+use TechDivision\ServletEngine\CoreValve;
+use TechDivision\ServletEngine\ServletValve;
+use TechDivision\ServletEngine\Authentication\AuthenticationValve;
+use TechDivision\ServletEngine\Authentication\StandardAuthenticationManager;
 use TechDivision\ServletEngine\Http\Session;
 use TechDivision\ServletEngine\Http\Request;
 use TechDivision\ServletEngine\Http\Response;
 use TechDivision\ServletEngine\Http\HttpRequestContext;
+use TechDivision\WebContainer\VirtualHost;
 use TechDivision\WebServer\Dictionaries\ServerVars;
 use TechDivision\WebServer\Interfaces\ModuleInterface;
 use TechDivision\WebServer\Interfaces\ServerContextInterface;
@@ -77,6 +79,13 @@ class ServletModule implements ModuleInterface
      * @var \TechDivision\ServletEngine\Engine
      */
     protected $engine;
+    
+    /**
+     * Array that contains the initialized applications.
+     * 
+     * @var array
+     */
+    protected $applications = array();
 
     /**
      * Returns an array of module names which should be executed first.
@@ -112,16 +121,18 @@ class ServletModule implements ModuleInterface
             
             // initialize the server context
             $this->serverContext = $serverContext;
+
+            // register the class loader
+            $this->registerClassLoader();
             
-            // register the class loader instance
-            $this->getInitialContext()->getClassLoader()->register(true);
+            $this->applications = $this->getApplications();
+            
+            // initialize the applications
+            // $this->deployApplications();
             
             // initialize the engine
             $this->engine = new Engine();
-            
-            $this->engine->injectContainer($this->getContainer());
-            $this->engine->injectApplications($this->getApplications());
-            $this->engine->injectManager($this->getManager());
+            $this->engine->injectValves($this->getValves());
             $this->engine->init();
             
         } catch (\Exception $e) {
@@ -142,9 +153,6 @@ class ServletModule implements ModuleInterface
     {
         
         try {
-    
-            // start buffering the output
-            ob_start();
             
             // make server context local
             $serverContext = $this->getServerContext();
@@ -162,14 +170,7 @@ class ServletModule implements ModuleInterface
             
             // intialize servlet session, request + response
             $servletRequest = new Request();
-            
-            // initialize the servlet request with the Http request values
-            $servletRequest->setDocumentRoot($serverContext->getServerVar(ServerVars::DOCUMENT_ROOT));
-            $servletRequest->setHeaders($request->getHeaders());
-            $servletRequest->setMethod($request->getMethod());
-            $servletRequest->setParameterMap($request->getParams());
-            $servletRequest->setQueryString($request->getQueryString());
-            $servletRequest->setUri($request->getUri());
+            $servletRequest->injectHttpRequest($request);
             
             // transform the cookie headers into real servlet cookies
             if ($servletRequest->hasHeader(HttpProtocol::HEADER_COOKIE)) {
@@ -227,28 +228,19 @@ class ServletModule implements ModuleInterface
             
             // initialize the servlet response with the Http response values
             $servletResponse = new Response();
-            $servletResponse->setHeaders($response->getHeaders());
-            $servletResponse->setStatusCode($response->getStatusCode());
-            $servletResponse->setStatusLine($response->getStatusLine());
-            $servletResponse->setStatusReasonPhrase($response->getStatusReasonPhrase());
+            $servletResponse->injectHttpResponse($response);
+            $servletRequest->injectResponse($servletResponse);
 
             // create the request context and inject it into the servlet request
             $requestContext = new HttpRequestContext();
             $requestContext->injectServerVars($serverContext->getServerVars());
+            $requestContext->injectSessionManager($this->getSessionManager());
+            $requestContext->injectAuthenticationManager($this->getAuthenticationManager());
+            $requestContext->injectApplications($this->getApplications());
             $servletRequest->injectContext($requestContext);
             
+            // let the servlet engine process the request
             $engine->process($servletRequest, $servletResponse);
-            
-            // add the content of the servlet response back to the Http response
-            $response->appendBodyStream($servletResponse->getBodyStream());
-            
-            // set the response status code
-            $response->setStatusCode($servletResponse->getStatusCode());
-            
-            // add the headers of the servlet response back to the Http response
-            foreach ($servletResponse->getHeaders() as $name => $value) {
-                $response->addHeader($name, $value);
-            }
             
             // transform the servlet response cookies into Http headers
             foreach ($servletResponse->getCookies() as $cookie) {
@@ -285,7 +277,7 @@ class ServletModule implements ModuleInterface
      * 
      * @return \TechDivision\ServletEngine\SessionManager The session manager instance
      */
-    protected function getManager()
+    protected function getSessionManager()
     {
 
         // initialize the session settings + storage
@@ -299,68 +291,6 @@ class ServletModule implements ModuleInterface
         
         // return the initialized session manager instance
         return $manager;
-    }
-
-    /**
-     * Returns the deployed application instances.
-     *
-     * @return array The deployed application instances
-     */
-    protected function getApplications()
-    {
-
-        // create a new API app service instance
-        $appService = $this->getAppService();
-        
-        // load the initialized applications
-        $applications = $this->getDeployment()->deploy()->getApplications();
-        
-        // iterate over the applications and register them in the system configuration
-        foreach ($applications as $application) {
-            
-            // check if the application has already been registered
-            $appNode = $appService->loadByWebappPath($application->getWebappPath());
-        
-            // check if the app has already been attached to the container
-            if ($appNode == null) { // if not, create a new node and attach it
-                $appNode = $appService->create($application);
-                $appNode->setParentUuid($this->getContainerNode()->getParentUuid());
-                $appService->persist($appNode);
-            }
-        }
-        
-        // return the applications
-        return $applications;
-    }
-    
-    /**
-     * Returns the array with the virtual host configuration for the
-     * servlet engine.
-     * 
-     * @return array The array with the virtual host configuration
-     */
-    protected function getVHosts()
-    {
-            
-        // initialize the array with the servlet engines virtual hosts
-        $vhosts = array();
-
-        // load the document root and the web servers virtual host configuration
-        $documentRoot = $this->getDocumentRoot();
-        $virtualHosts = $this->getVirtualHosts();
-        
-        // prepare the virtual host configurations
-        foreach ($virtualHosts as $domain => $virtualHost) {
-            
-            // prepare the applications base directory
-            $appBase = str_replace($documentRoot, '', $virtualHost['documentRoot']);
-            
-            // append the virtual host to the array
-            $vhosts[] = new VirtualHost($domain, $appBase);
-        }
-        
-        // return the array with the servlet engines virtual hosts
-        return $vhosts;
     }
 
     /**
@@ -394,25 +324,73 @@ class ServletModule implements ModuleInterface
     {
         return str_replace($this->getBaseDirectory(), '', $this->getDocumentRoot());
     }
-
+    
     /**
-     * Returns the deployment instance for the container for
-     * this container thread.
-     *
-     * @return \TechDivision\ApplicationServer\Interfaces\DeploymentInterface The deployment instance for this container thread
+     * Returns the valves that handles the request.
+     * 
+     * @return \SplObjectStorage The valves to handle the request
      */
-    protected function getDeployment()
+    protected function getValves()
     {
-
-        // initialize the servlet engine deployment
-        $deployment = new ServletDeployment();
-        $deployment->injectInitialContext($this->getInitialContext());
-        $deployment->injectVirtualHosts($this->getVHosts());
-        $deployment->injectBaseDirectory($this->getBaseDirectory());
-        $deployment->injectAppBase($this->getAppBase());
+        $valves = new \SplObjectStorage();
+        $valves->attach(new CoreValve());
+        $valves->attach(new AuthenticationValve());
+        $valves->attach(new ServletValve());
+        return $valves;
+    }
+    
+    /**
+     * Returns the initialized applications.
+     * 
+     * @return array The array with the applications
+     */
+    protected function getApplications()
+    {
         
-        // return the initialized deployment instance
-        return $deployment;
+        /*
+         * Build an array with patterns as key and an array with application name and document root as value. This
+         * helps to improve speed when matching an request to find the application to handle it.
+         *
+         * The array looks something like this:
+         *
+         * /^www.appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/               => application
+         * /^appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/                   => application
+         * /^appserver.local(\/([a-z0-9+\$_-]\.?)+)*\/?/                => application
+         * /^neos.local(\/([a-z0-9+\$_-]\.?)+)*\/?/                     => application
+         * /^neos.appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/              => application
+         * /^[a-z0-9-.]*\/neos(\/([a-z0-9+\$_-]\.?)+)*\/?/              => application
+         * /^[a-z0-9-.]*\/example(\/([a-z0-9+\$_-]\.?)+)*\/?/           => application
+         * /^[a-z0-9-.]*\/magento-1.8.1.0(\/([a-z0-9+\$_-]\.?)+)*\/?/   => application
+         *
+         * This should also match request URI's like:
+         *
+         * 127.0.0.1:8586/magento-1.8.1.0/index.php/admin/dashboard/index/key/8394a99f7bd5f4aca531d7c752a5fdb1/
+         */
+    
+        $applications = array();
+        
+        // iterate over a applications vhost/alias configuration
+        foreach ($this->getContainer()->getApplications() as $application) {
+        
+            // iterate over the virtual hosts
+            foreach ($this->getVirtualHosts() as $virtualHost) {
+        
+                // check if the virtual host match the application
+                if ($virtualHost->match($application)) {
+        
+                    // bind the virtual host to the application
+                    $application->addVirtualHost($virtualHost);
+                    
+                    // add the application to the internal array
+                    $applications = array('/^' . $virtualHost->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application) + $applications;
+                }
+            }
+        
+            // finally APPEND a wildcard pattern for each application to the patterns array
+            $applications = $applications + array('/^[a-z0-9-.]*\/' . $application->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application);
+        }
+        
+        return $applications;
     }
     
     /**
@@ -422,7 +400,25 @@ class ServletModule implements ModuleInterface
      */
     protected function getVirtualHosts()
     {
-        return $this->getServerContext()->getServerConfig()->getVirtualHosts();
+        
+        // initialize the array with the servlet engines virtual hosts
+        $virtualHosts = array();
+        
+        // load the document root and the web servers virtual host configuration
+        $documentRoot = $this->getDocumentRoot();
+        
+        // prepare the virtual host configurations
+        foreach ($this->getServerContext()->getServerConfig()->getVirtualHosts() as $domain => $virtualHost) {
+        
+            // prepare the applications base directory
+            $appBase = str_replace($documentRoot, '', $virtualHost['documentRoot']);
+        
+            // append the virtual host to the array
+            $virtualHosts[] = new VirtualHost($domain, $appBase);
+        }
+        
+        // return the array with the servlet engines virtual hosts
+        return $virtualHosts;
     }
     
     /**
@@ -464,6 +460,16 @@ class ServletModule implements ModuleInterface
     {
         return new ContainerService($this->getInitialContext());
     }
+    
+    /**
+     * Returns the authentication manager.
+     * 
+     * @return \TechDivision\ServletEngine\Authentication\AuthenticationManager
+     */
+    protected function getAuthenticationManager()
+    {
+        return new StandardAuthenticationManager();
+    }
 
     /**
      * Returns the inital context instance.
@@ -473,5 +479,16 @@ class ServletModule implements ModuleInterface
     protected function getInitialContext()
     {
         return $this->getContainer()->getInitialContext();
+    }
+    
+    /**
+     * Register the class loader again, because in a thread the context 
+     * lost all class loader information.
+     * 
+     * @return void
+     */
+    protected function registerClassLoader()
+    {
+        $this->getInitialContext()->getClassLoader()->register(true);
     }
 }
