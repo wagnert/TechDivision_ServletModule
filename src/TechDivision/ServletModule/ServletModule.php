@@ -246,7 +246,7 @@ class ServletModule implements ModuleInterface
             }
 
         } catch (\Exception $e) {
-            throw new ModuleException($e);
+            throw new ModuleException($e, 500);
         }
     }
 
