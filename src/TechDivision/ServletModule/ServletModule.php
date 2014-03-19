@@ -24,15 +24,12 @@ namespace TechDivision\ServletModule;
 use TechDivision\Http\HttpProtocol;
 use TechDivision\Http\HttpRequestInterface;
 use TechDivision\Http\HttpResponseInterface;
-use TechDivision\Storage\StackableStorage;
 use TechDivision\Servlet\Http\Cookie;
+use TechDivision\Servlet\ServletRequest;
 use TechDivision\ServletEngine\Engine;
-use TechDivision\ServletEngine\DefaultSessionSettings;
-use TechDivision\ServletEngine\StandardSessionManager;
-use TechDivision\ServletEngine\CoreValve;
 use TechDivision\ServletEngine\ServletValve;
+use TechDivision\ServletEngine\BadRequestException;
 use TechDivision\ServletEngine\Authentication\AuthenticationValve;
-use TechDivision\ServletEngine\Authentication\StandardAuthenticationManager;
 use TechDivision\ServletEngine\Http\Session;
 use TechDivision\ServletEngine\Http\Request;
 use TechDivision\ServletEngine\Http\Response;
@@ -121,22 +118,87 @@ class ServletModule implements ModuleInterface
 
             // initialize the server context
             $this->serverContext = $serverContext;
-
-            // register the class loader
-            $this->registerClassLoader();
-
-            $this->applications = $this->getApplications();
-
-            // initialize the applications
-            // $this->deployApplications();
-
-            // initialize the engine
-            $this->engine = new Engine();
-            $this->engine->injectValves($this->getValves());
-            $this->engine->init();
-
+            
+            // initialize the class loader, the applications and the engine
+            $this->initClassLoader();
+            $this->initApplications();
+            $this->initEngine();
+            
         } catch (\Exception $e) {
             throw new ModuleException($e);
+        }
+    }
+    
+    /**
+     * Register the class loader again, because in a thread the context 
+     * lost all class loader information.
+     * 
+     * @return void
+     */
+    protected function initClassLoader()
+    {
+        $this->getInitialContext()->getClassLoader()->register(true);
+    }
+    
+    /**
+     * Initializes the servlet engine.
+     * 
+     * @return void
+     */
+    protected function initEngine()
+    {
+        $this->engine = new Engine();
+        $this->engine->injectValves($this->getValves());
+        $this->engine->init();
+    }
+    
+    /**
+     * Returns the initialized applications.
+     * 
+     * @return void
+     */
+    protected function initApplications()
+    {
+        
+        /*
+         * Build an array with patterns as key and an array with application name and document root as value. This
+         * helps to improve speed when matching an request to find the application to handle it.
+         *
+         * The array looks something like this:
+         *
+         * /^www.appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/               => application
+         * /^appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/                   => application
+         * /^appserver.local(\/([a-z0-9+\$_-]\.?)+)*\/?/                => application
+         * /^neos.local(\/([a-z0-9+\$_-]\.?)+)*\/?/                     => application
+         * /^neos.appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/              => application
+         * /^[a-z0-9-.]*\/neos(\/([a-z0-9+\$_-]\.?)+)*\/?/              => application
+         * /^[a-z0-9-.]*\/example(\/([a-z0-9+\$_-]\.?)+)*\/?/           => application
+         * /^[a-z0-9-.]*\/magento-1.8.1.0(\/([a-z0-9+\$_-]\.?)+)*\/?/   => application
+         *
+         * This should also match request URI's like:
+         *
+         * 127.0.0.1:8586/magento-1.8.1.0/index.php/admin/dashboard/index/key/8394a99f7bd5f4aca531d7c752a5fdb1/
+         */
+        
+        // iterate over a applications vhost/alias configuration
+        foreach ($this->getContainer()->getApplications() as $application) {
+        
+            // iterate over the virtual hosts
+            foreach ($this->getVirtualHosts() as $virtualHost) {
+        
+                // check if the virtual host match the application
+                if ($virtualHost->match($application)) {
+        
+                    // bind the virtual host to the application
+                    $application->addVirtualHost($virtualHost);
+                    
+                    // add the application to the internal array
+                    $this->applications = array('/^' . $virtualHost->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application) + $this->applications;
+                }
+            }
+        
+            // finally APPEND a wildcard pattern for each application to the patterns array
+            $this->applications = $this->applications + array('/^[a-z0-9-.]*\/' . $application->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application);
         }
     }
 
@@ -161,96 +223,23 @@ class ServletModule implements ModuleInterface
             if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
                 return;
             }
-
-            // make engine locally available
-            $engine = $this->getEngine();
-
-            // make the handlers locally available
-            $handlers = $serverContext->getServerConfig()->getHandlers();
-
+            
             // intialize servlet session, request + response
             $servletRequest = new Request();
             $servletRequest->injectHttpRequest($request);
-
-            // transform the cookie headers into real servlet cookies
-            if ($servletRequest->hasHeader(HttpProtocol::HEADER_COOKIE)) {
-
-                // explode the cookie headers
-                $cookieHeaders = explode('; ', $servletRequest->getHeader(HttpProtocol::HEADER_COOKIE));
-
-                // create real cookie for each cookie key/value pair
-                foreach ($cookieHeaders as $cookieHeader) {
-
-                    // explode the data and create a cookie instance
-                    list ($name, $value) = explode('=', $cookieHeader);
-                    $servletRequest->addCookie(new Cookie($name, $value));
-                }
-            }
-
-            // get uri without querystring
-            // Just make sure that you check for the existence of the query string first, as it might not be set
-            $uriWithoutQueryString = $serverContext->getServerVar(ServerVars::REQUEST_URI);
-            if ($serverContext->hasServerVar(ServerVars::QUERY_STRING)) {
-
-                $uriWithoutQueryString = str_replace(
-                    '?' . $serverContext->getServerVar(ServerVars::QUERY_STRING),
-                    '',
-                    $uriWithoutQueryString
-                );
-            }
-
-            // initialize the path information and the directory to start with
-            list ($dirname, $basename, $extension) = array_values(pathinfo($uriWithoutQueryString));
-
-            do { // descent the directory structure down to find the (almost virtual) servlet file
-
-                // bingo we found a (again: almost virtual) servlet file
-                if (array_key_exists(".$extension", $handlers) && $handlers[".$extension"] === $this->getModuleName()) {
-
-                    // prepare the servlet path
-                    if ($dirname === '/') {
-                        $servletPath = DIRECTORY_SEPARATOR . $basename;
-                    } else {
-                        $servletPath = $dirname . DIRECTORY_SEPARATOR . $basename;
-                    }
-
-                    // we set the basename, because this is the servlet path
-                    $servletRequest->setServletPath($servletPath);
-
-                    // we set the path info, what is the request URI with stripped dir- and basename
-                    $servletRequest->setPathInfo(
-                        $pathInfo = str_replace(
-                            $servletPath,
-                            '',
-                            $uriWithoutQueryString
-                        )
-                    );
-
-                    // we've found what we were looking for, so break here
-                    break;
-                }
-
-                // descendent down the directory tree
-                list ($dirname, $basename, $extension) = array_values(pathinfo($dirname));
-
-            } while ($dirname !== false); // stop until we reached the root of the URI
+            $servletRequest->injectServerVars($serverContext->getServerVars());
+            
+            // prepare the servlet request
+            $this->prepareServletRequest($servletRequest);
 
             // initialize the servlet response with the Http response values
             $servletResponse = new Response();
             $servletResponse->injectHttpResponse($response);
             $servletRequest->injectResponse($servletResponse);
-
-            // create the request context and inject it into the servlet request
-            $requestContext = new HttpRequestContext();
-            $requestContext->injectServerVars($serverContext->getServerVars());
-            $requestContext->injectSessionManager($this->getSessionManager());
-            $requestContext->injectAuthenticationManager($this->getAuthenticationManager());
-            $requestContext->injectApplications($this->getApplications());
-            $servletRequest->injectContext($requestContext);
-
+            
             // let the servlet engine process the request
-            $engine->process($servletRequest, $servletResponse);
-
+            $this->getEngine()->process($servletRequest, $servletResponse);
+ 
             // transform the servlet response cookies into Http headers
             foreach ($servletResponse->getCookies() as $cookie) {
                 $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
@@ -262,13 +251,107 @@ class ServletModule implements ModuleInterface
     }
 
     /**
-     * Returns the servlet instance.
-     *
-     * @return \TechDivision\ServletEngine\Engine The servlet engine instance
+     * Tries to find an application that matches the passed request.
+     * 
+     * @param \TechDivision\Servlet\ServletRequest $servletRequest The request instance to locate the application for
+     * 
+     * @return array The application info that matches the request
+     * @throws \TechDivision\ServletEngine\BadRequestException Is thrown if no application matches the request
      */
-    protected function getEngine()
+    protected function prepareServletRequest(ServletRequest $servletRequest)
     {
-        return $this->engine;
+        
+        // transform the cookie headers into real servlet cookies
+        if ($servletRequest->hasHeader(HttpProtocol::HEADER_COOKIE)) {
+            
+            // explode the cookie headers
+            $cookieHeaders = explode('; ', $servletRequest->getHeader(HttpProtocol::HEADER_COOKIE));
+            
+            // create real cookie for each cookie key/value pair
+            foreach ($cookieHeaders as $cookieHeader) {
+                
+                // explode the data and create a cookie instance
+                list ($name, $value) = explode('=', $cookieHeader);
+                $servletRequest->addCookie(new Cookie($name, $value));
+            }
+        }
+            
+        // load the request URI and query string
+        $uri = $servletRequest->getUri();
+        $queryString = $servletRequest->getQueryString();
+        
+        // get uri without querystring
+        $uriWithoutQueryString = str_replace('?' . $queryString, '', $uri);
+        
+        // initialize the path information and the directory to start with
+        list ($dirname, $basename, $extension) = array_values(pathinfo($uriWithoutQueryString));
+        
+        // make the registered handlers local
+        $handlers = $this->getHandlers();
+        
+        do { // descent the directory structure down to find the (almost virtual) servlet file
+            
+            // bingo we found a (again: almost virtual) servlet file
+            if (array_key_exists(".$extension", $handlers) && $handlers[".$extension"] === $this->getModuleName()) {
+                
+                // prepare the servlet path
+                if ($dirname === '/') {
+                    $servletPath = DIRECTORY_SEPARATOR . $basename;
+                } else {
+                    $servletPath = $dirname . DIRECTORY_SEPARATOR . $basename;
+                }
+                
+                // we set the basename, because this is the servlet path
+                $servletRequest->setServletPath($servletPath);
+                
+                // we set the path info, what is the request URI with stripped dir- and basename
+                $servletRequest->setPathInfo(
+                    $pathInfo = str_replace(
+                        $servletPath,
+                        '',
+                        $uriWithoutQueryString
+                    )
+                );
+    
+                // we've found what we were looking for, so break here
+                break;
+            }
+        
+            // descendent down the directory tree
+            list ($dirname, $basename, $extension) = array_values(pathinfo($dirname));
+        
+        } while ($dirname !== false); // stop until we reached the root of the URI
+
+        // explode host and port from the host header
+        list ($host, $port) = explode(':', $servletRequest->getHeader(HttpProtocol::HEADER_HOST));
+        
+        // prepare the URI to be matched
+        $url =  $host . $uri;
+        
+        // try to find the application by match it one of the prepared patterns
+        foreach ($this->getApplications() as $pattern => $application) {
+        
+            // try to match a registered application with the passed request
+            if (preg_match($pattern, $url) === 1) {
+                
+                // prepare and set the applications context path
+                $servletRequest->setContextPath($contextPath = '/' . $application->getName());
+
+                // prepare the path information depending if we're in a vhost or not
+                if ($application->isVhostOf($host) === false) {
+                    $servletRequest->setServletPath(str_replace($contextPath, '', $servletRequest->getServletPath()));
+                }
+                
+                // inject the application context into the servlet request
+                $servletRequest->injectContext($application);
+                
+                // return, because request has been prepared successfully
+                return;
+            }
+        }
+        
+        // if not throw a bad request exception
+        throw new BadRequestException(sprintf('Can\'t find application for URI %s', $uri));
     }
 
     /**
@@ -282,24 +365,23 @@ class ServletModule implements ModuleInterface
     }
 
     /**
-     * Returns an initialized session manager instance.
-     *
-     * @return \TechDivision\ServletEngine\SessionManager The session manager instance
+     * Returns the servlet instance.
+     * 
+     * @return \TechDivision\ServletEngine\Engine The servlet engine instance
      */
-    protected function getSessionManager()
+    protected function getEngine()
     {
+        return $this->engine;
+    }
 
-        // initialize the session settings + storage
-        $storage = new StackableStorage();
-        $storage->injectStorage($this->getServerContext()->getContainer()->getInitialContext()->getStorage()->getStorage());
-
-        // initialize the session manager
-        $manager = new StandardSessionManager();
-        $manager->injectSettings(new DefaultSessionSettings());
-        $manager->injectStorage($storage);
-
-        // return the initialized session manager instance
-        return $manager;
+    /**
+     * Returns the array with the initialized applications.
+     *
+     * @return array Array with initialized applications
+     */
+    protected function getApplications()
+    {
+        return $this->applications;
     }
 
     /**
@@ -323,6 +405,16 @@ class ServletModule implements ModuleInterface
     {
         return $this->getServerContext()->getServerConfig()->getDocumentRoot();
     }
+    
+    /**
+     * Returns the array with the registered handlers.
+     * 
+     * @return array The array with the registered handlers
+     */
+    protected function getHandlers()
+    {
+        return $this->getServerContext()->getServerConfig()->getHandlers();
+    }
 
     /**
      * Returns the path, relative to the base directory, containing the web applications.
@@ -342,64 +434,9 @@ class ServletModule implements ModuleInterface
     protected function getValves()
     {
         $valves = new \SplObjectStorage();
-        $valves->attach(new CoreValve());
         $valves->attach(new AuthenticationValve());
         $valves->attach(new ServletValve());
         return $valves;
-    }
-
-    /**
-     * Returns the initialized applications.
-     *
-     * @return array The array with the applications
-     */
-    protected function getApplications()
-    {
-
-        /*
-         * Build an array with patterns as key and an array with application name and document root as value. This
-         * helps to improve speed when matching an request to find the application to handle it.
-         *
-         * The array looks something like this:
-         *
-         * /^www.appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/               => application
-         * /^appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/                   => application
-         * /^appserver.local(\/([a-z0-9+\$_-]\.?)+)*\/?/                => application
-         * /^neos.local(\/([a-z0-9+\$_-]\.?)+)*\/?/                     => application
-         * /^neos.appserver.io(\/([a-z0-9+\$_-]\.?)+)*\/?/              => application
-         * /^[a-z0-9-.]*\/neos(\/([a-z0-9+\$_-]\.?)+)*\/?/              => application
-         * /^[a-z0-9-.]*\/example(\/([a-z0-9+\$_-]\.?)+)*\/?/           => application
-         * /^[a-z0-9-.]*\/magento-1.8.1.0(\/([a-z0-9+\$_-]\.?)+)*\/?/   => application
-         *
-         * This should also match request URI's like:
-         *
-         * 127.0.0.1:8586/magento-1.8.1.0/index.php/admin/dashboard/index/key/8394a99f7bd5f4aca531d7c752a5fdb1/
-         */
-
-        $applications = array();
-
-        // iterate over a applications vhost/alias configuration
-        foreach ($this->getContainer()->getApplications() as $application) {
-
-            // iterate over the virtual hosts
-            foreach ($this->getVirtualHosts() as $virtualHost) {
-
-                // check if the virtual host match the application
-                if ($virtualHost->match($application)) {
-
-                    // bind the virtual host to the application
-                    $application->addVirtualHost($virtualHost);
-
-                    // add the application to the internal array
-                    $applications = array('/^' . $virtualHost->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application) + $applications;
-                }
-            }
-
-            // finally APPEND a wildcard pattern for each application to the patterns array
-            $applications = $applications + array('/^[a-z0-9-.]*\/' . $application->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application);
-        }
-
-        return $applications;
     }
 
     /**
@@ -471,16 +508,6 @@ class ServletModule implements ModuleInterface
     }
 
     /**
-     * Returns the authentication manager.
-     *
-     * @return \TechDivision\ServletEngine\Authentication\AuthenticationManager
-     */
-    protected function getAuthenticationManager()
-    {
-        return new StandardAuthenticationManager();
-    }
-
-    /**
      * Returns the inital context instance.
      *
      * @return \TechDivision\ApplicationServer\InitialContext The initial context instance
@@ -488,16 +515,5 @@ class ServletModule implements ModuleInterface
     protected function getInitialContext()
     {
         return $this->getContainer()->getInitialContext();
-    }
-
-    /**
-     * Register the class loader again, because in a thread the context
-     * lost all class loader information.
-     *
-     * @return void
-     */
-    protected function registerClassLoader()
-    {
-        $this->getInitialContext()->getClassLoader()->register(true);
     }
 }
