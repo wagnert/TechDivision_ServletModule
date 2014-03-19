@@ -55,31 +55,31 @@ use TechDivision\ApplicationServer\Api\Node\AppNode;
  */
 class ServletModule implements ModuleInterface
 {
-    
+
     /**
      * The unique module name in the web server context.
-     * 
+     *
      * @var string
      */
     const MODULE_NAME = 'servlet';
-    
+
     /**
      * The server context instance.
-     * 
+     *
      * @var \TechDivision\WebServer\Interfaces\ServerContextInterface
      */
     protected $serverContext;
-    
+
     /**
      * The servlet engine instance.
-     * 
+     *
      * @var \TechDivision\ServletEngine\Engine
      */
     protected $engine;
-    
+
     /**
      * Array that contains the initialized applications.
-     * 
+     *
      * @var array
      */
     protected $applications = array();
@@ -108,17 +108,17 @@ class ServletModule implements ModuleInterface
      * Initializes the module.
      *
      * @param \TechDivision\WebServer\Interfaces\ServerContextInterface $serverContext The servers context instance
-     * 
+     *
      * @return void
      * @throws \TechDivision\WebServer\Exceptions\ModuleException
      */
     public function init(ServerContextInterface $serverContext)
     {
         try {
-            
+
             // initialize the server context
             $this->serverContext = $serverContext;
-
+            
             // initialize the class loader, the applications and the engine
             $this->initClassLoader();
             $this->initApplications();
@@ -207,18 +207,18 @@ class ServletModule implements ModuleInterface
      *
      * @param \TechDivision\Http\HttpRequestInterface  $request  The request instance
      * @param \TechDivision\Http\HttpResponseInterface $response The response instance
-     * 
+     *
      * @return void
-     * @throws \TechDivision\WebServer\Exceptions\ModuleException 
+     * @throws \TechDivision\WebServer\Exceptions\ModuleException
      */
     public function process(HttpRequestInterface $request, HttpResponseInterface $response)
     {
-        
+
         try {
-            
+
             // make server context local
             $serverContext = $this->getServerContext();
-            
+
             // check if we are the handler that has to process this request
             if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
                 return;
@@ -231,7 +231,7 @@ class ServletModule implements ModuleInterface
             
             // prepare the servlet request
             $this->prepareServletRequest($servletRequest);
-            
+
             // initialize the servlet response with the Http response values
             $servletResponse = new Response();
             $servletResponse->injectHttpResponse($response);
@@ -239,17 +239,17 @@ class ServletModule implements ModuleInterface
             
             // let the servlet engine process the request
             $this->getEngine()->process($servletRequest, $servletResponse);
-            
+ 
             // transform the servlet response cookies into Http headers
             foreach ($servletResponse->getCookies() as $cookie) {
                 $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
             }
-            
+
         } catch (\Exception $e) {
             throw new ModuleException($e);
         }
     }
-    
+
     /**
      * Tries to find an application that matches the passed request.
      * 
@@ -353,17 +353,17 @@ class ServletModule implements ModuleInterface
         // if not throw a bad request exception
         throw new BadRequestException(sprintf('Can\'t find application for URI %s', $uri));
     }
-    
+
     /**
      * Returns the server context instance.
-     * 
+     *
      * @return \TechDivision\WebServer\Interfaces\ServerContextInterface The server context instance
      */
     protected function getServerContext()
     {
         return $this->serverContext;
     }
-    
+
     /**
      * Returns the servlet instance.
      * 
@@ -395,10 +395,10 @@ class ServletModule implements ModuleInterface
     {
         return $this->getContainerService()->getBaseDirectory($directoryToAppend);
     }
-    
+
     /**
      * Returns the servers document root.
-     * 
+     *
      * @return string The servers document root
      */
     protected function getDocumentRoot()
@@ -425,10 +425,10 @@ class ServletModule implements ModuleInterface
     {
         return str_replace($this->getBaseDirectory(), '', $this->getDocumentRoot());
     }
-    
+
     /**
      * Returns the valves that handles the request.
-     * 
+     *
      * @return \SplObjectStorage The valves to handle the request
      */
     protected function getValves()
@@ -438,38 +438,38 @@ class ServletModule implements ModuleInterface
         $valves->attach(new ServletValve());
         return $valves;
     }
-    
+
     /**
      * Returns the web servers virtual host configuration as array.
-     * 
+     *
      * @return array The web servers virtual host configuration
      */
     protected function getVirtualHosts()
     {
-        
+
         // initialize the array with the servlet engines virtual hosts
         $virtualHosts = array();
-        
+
         // load the document root and the web servers virtual host configuration
         $documentRoot = $this->getDocumentRoot();
-        
+
         // prepare the virtual host configurations
         foreach ($this->getServerContext()->getServerConfig()->getVirtualHosts() as $domain => $virtualHost) {
-        
+
             // prepare the applications base directory
             $appBase = str_replace($documentRoot, '', $virtualHost['documentRoot']);
-        
+
             // append the virtual host to the array
             $virtualHosts[] = new VirtualHost($domain, $appBase);
         }
-        
+
         // return the array with the servlet engines virtual hosts
         return $virtualHosts;
     }
-    
+
     /**
      * Returns the app service.
-     * 
+     *
      * @return \TechDivision\ApplicationServer\Api\AppService The app service instance
      */
     protected function getAppService()
@@ -496,10 +496,10 @@ class ServletModule implements ModuleInterface
     {
         return $this->getContainer()->getContainerNode();
     }
-    
+
     /**
      * Returns the container service.
-     * 
+     *
      * @return \TechDivision\ApplicationServer\Api\ContainerService The container service instance
      */
     protected function getContainerService()
