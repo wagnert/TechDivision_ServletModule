@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <project name="TechDivision_ServletModule" default="deploy" basedir=".">
-    
+
 	<property environment="env" />
-	
+
     <property name="namespace" value="techdivision" />
     <property name="module" value="servletmodule"/>
     <property name="codepool" value="vendor"/>
@@ -10,18 +10,18 @@
     <property name="php-src.dir" value="${basedir}/src" />
     <property name="php-test.dir" value="${basedir}/tests" />
     <property name="php-target.dir" value="${basedir}/target"/>
-	
+
 	<property file="${basedir}/build.properties"/>
 	<property file="${basedir}/build.default.properties"/>
     <property file="${basedir}/build.${os.family}.properties"/>
-	
+
 	<!-- ==================================================================== -->
 	<!-- Cleans the directories with the generated source files				  -->
 	<!-- ==================================================================== -->
 	<target name="clean" description="Cleans almost everything, so use carefully.">
 		<delete dir="${php-target.dir}" includeemptydirs="true" quiet="false" verbose="true" failonerror="true"/>
 	</target>
-	
+
 	<!-- ==================================================================== -->
 	<!-- Prepares all the required directories								  -->
 	<!-- ==================================================================== -->
@@ -30,7 +30,7 @@
         <mkdir dir="${php-target.dir}/reports" />
         <mkdir dir="${php-target.dir}/reports/coverage" />
 	</target>
-	
+
     <!-- ==================================================================== -->
     <!-- Copies the sources to the target directory                           -->
     <!-- ==================================================================== -->
@@ -41,11 +41,11 @@
             </fileset>
         </copy>
     </target>
-	
+
 	<!-- ==================================================================== -->
 	<!-- Copies the sources to the deploy directory     					  -->
 	<!-- ==================================================================== -->
-	<target name="deploy" description="Copies the sources to the deploy directory.">				
+	<target name="deploy" description="Copies the sources to the deploy directory.">
 		<antcall target="prepare"/>
 		<antcall target="copy"/>
 		<copy todir="${deploy.dir}/app/code" preservelastmodified="true" overwrite="true">
@@ -54,16 +54,16 @@
 			</fileset>
 		</copy>
 	</target>
-	
+
     <!-- ==================================================================== -->
     <!-- Generates the API documentation                                      -->
-    <!-- ==================================================================== -->   
+    <!-- ==================================================================== -->
     <target name="apidoc" description="Generates the API documentation.">
-         <exec executable="${pear.bin.dir}/phpdoc">  
-            <arg line="-ct type -ue on -s on -t ${php-target.dir}/docs -o HTML:frames:earthli -d ${php-src.dir}"/>  
+         <exec executable="${pear.bin.dir}/phpdoc">
+            <arg line="-ct type -ue on -s on -t ${php-target.dir}/docs -o HTML:frames:earthli -d ${php-src.dir}"/>
          </exec>
     </target>
-	
+
     <!-- ==================================================================== -->
     <!-- Runs the code sniffer and generates a report                         -->
     <!-- ==================================================================== -->
@@ -73,7 +73,7 @@
             <arg line="-n --extensions=php --standard=phpcs.xml ./"/>
         </exec>
     </target>
-	
+
     <!-- ==================================================================== -->
     <!-- Runs the copy and paste detection                                    -->
     <!-- ==================================================================== -->
@@ -82,7 +82,7 @@
             <arg line="--log-pmd ${php-target.dir}/reports/pmd-cpd.xml ${php-src.dir}"/>
         </exec>
     </target>
-	
+
     <!-- ==================================================================== -->
     <!-- Generate phploc.csv                                                  -->
     <!-- ==================================================================== -->
@@ -91,7 +91,7 @@
             <arg line="--log-xml ${php-target.dir}/reports/phploc.xml ${php-src.dir}"/>
         </exec>
     </target>
-	
+
     <!-- ==================================================================== -->
     <!-- Runs the PHPDepend tool and generats a graphs                        -->
     <!-- ==================================================================== -->
@@ -100,7 +100,7 @@
             <arg line="--summary-xml=${php-target.dir}/reports/pdepend.xml --jdepend-xml=${php-target.dir}/reports/jdepend.xml --jdepend-chart=${php-target.dir}/reports/jdepend.svg --overview-pyramid=${php-target.dir}/reports/pdepend-pyramid.svg ${php-src.dir}" />
         </exec>
     </target>
-	
+
     <!-- ==================================================================== -->
     <!-- Runs the PHP mess detector tool                                      -->
     <!-- ==================================================================== -->
@@ -128,6 +128,7 @@
         <!-- install composer packages -->
         <exec dir="${php-target.dir}" executable="composer">
             <env key="PATH" value="${instance.base.dir}/bin:${env.PATH}"/>
+            <env key="COMPOSER_ROOT_VERSION" value="dev-master"/>
             <arg line="--no-interaction update"/>
         </exec>
     </target>
@@ -149,7 +150,7 @@
         	<arg line="-d zend_extension=xdebug.so ${instance.base.dir}/app/code/vendor/bin/phpunit --configuration phpunit.xml.dist" />
         </exec>
     </target>
-	
+
 	<!-- ==================================================================== -->
 	<!-- Runs the PHPUnit tests and generates a report						  -->
 	<!-- ==================================================================== -->
@@ -164,5 +165,5 @@
         <antcall target="phpmd"/>
         -->
 	</target>
-	
+
 </project>

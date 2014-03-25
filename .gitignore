@@ -1,5 +1,21 @@
-/.project
-/.settings
-/.buildpath
-/target
+# vendor folder
+vendor/
+
+# composer.lock
+composer.lock
+
+# the apple directory description
+.DS_Store
+
+# but don't ignore this file
+!.gitignore
+
+# build environment
+target
+.buildpath
 build.properties
+
+# IDE settings
+.project
+.settings
+.idea
