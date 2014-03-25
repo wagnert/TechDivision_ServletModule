@@ -1,9 +1,10 @@
 {
     "name": "techdivision/servletmodule",
-    "type": "package",
     "description": "Servlet module implementation for the web container.",
     "homepage": "https://github.com/techdivision/TechDivision_ServletModule",
     "license": ["OSL-3.0"],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "repositories": [
         {
             "type": "vcs",
