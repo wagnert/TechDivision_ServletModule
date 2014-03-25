@@ -24,6 +24,7 @@ namespace TechDivision\ServletModule;
 use TechDivision\Http\HttpProtocol;
 use TechDivision\Http\HttpRequestInterface;
 use TechDivision\Http\HttpResponseInterface;
+use TechDivision\Http\HttpResponseStates;
 use TechDivision\Servlet\Http\Cookie;
 use TechDivision\Servlet\ServletRequest;
 use TechDivision\ServletEngine\Engine;
@@ -244,6 +245,9 @@ class ServletModule implements ModuleInterface
             foreach ($servletResponse->getCookies() as $cookie) {
                 $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
             }
+
+            // set response state to be dispatched after this without calling other modules process
+            $response->setState(HttpResponseStates::DISPATCH);
 
         } catch (\Exception $e) {
             throw new ModuleException($e, 500);
