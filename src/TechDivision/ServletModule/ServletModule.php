@@ -121,8 +121,7 @@ class ServletModule implements ModuleInterface
             // initialize the server context
             $this->serverContext = $serverContext;
 
-            // initialize the class loader, the applications and the engine
-            $this->initClassLoader();
+            // initialize the applications and the servlet engine
             $this->initApplications();
             $this->initEngine();
 
@@ -137,7 +136,7 @@ class ServletModule implements ModuleInterface
      *
      * @return void
      */
-    protected function initClassLoader()
+    protected function registerClassLoader()
     {
         $this->getInitialContext()->getClassLoader()->register(true);
     }
@@ -230,6 +229,9 @@ class ServletModule implements ModuleInterface
             if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
                 return;
             }
+            
+            // register the class loader
+            $this->registerClassLoader();
 
             // intialize servlet session, request + response
             $servletRequest = new Request();
