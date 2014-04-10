@@ -36,6 +36,7 @@ use TechDivision\ServletEngine\Http\Request;
 use TechDivision\ServletEngine\Http\Response;
 use TechDivision\ServletEngine\Http\HttpRequestContext;
 use TechDivision\WebContainer\VirtualHost;
+use TechDivision\WebServer\Dictionaries\ModuleHooks;
 use TechDivision\WebServer\Dictionaries\ServerVars;
 use TechDivision\WebServer\Interfaces\ModuleInterface;
 use TechDivision\WebServer\Interfaces\ServerContextInterface;
