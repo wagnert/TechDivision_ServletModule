@@ -206,14 +206,19 @@ class ServletModule implements ModuleInterface
     /**
      * Process the servlet engine.
      *
-     * @param \TechDivision\Http\HttpRequestInterface  $request  The request instance
-     * @param \TechDivision\Http\HttpResponseInterface $response The response instance
+     * @param \TechDivision\Http\HttpRequestInterface  $request  The request object
+     * @param \TechDivision\Http\HttpResponseInterface $response The response object
+     * @param int                                      $hook     The current hook to process logic for
      *
-     * @return void
+     * @return bool
      * @throws \TechDivision\WebServer\Exceptions\ModuleException
      */
-    public function process(HttpRequestInterface $request, HttpResponseInterface $response)
+    public function process(HttpRequestInterface $request, HttpResponseInterface $response, $hook)
     {
+        // if false hook is comming do nothing
+        if (ModuleHooks::REQUEST_POST !== $hook) {
+            return;
+        }
 
         try {
 
