@@ -308,9 +308,9 @@ class ServletModule implements ModuleInterface
 
                 // prepare the servlet path
                 if ($dirname === '/') {
-                    $servletPath = DIRECTORY_SEPARATOR . $basename;
+                    $servletPath = '/' . $basename;
                 } else {
-                    $servletPath = $dirname . DIRECTORY_SEPARATOR . $basename;
+                    $servletPath = $dirname . '/' . $basename;
                 }
 
                 // we set the basename, because this is the servlet path
