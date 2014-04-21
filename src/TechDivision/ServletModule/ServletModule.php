@@ -304,7 +304,7 @@ class ServletModule implements ModuleInterface
         do { // descent the directory structure down to find the (almost virtual) servlet file
 
             // bingo we found a (again: almost virtual) servlet file
-            if (array_key_exists(".$extension", $handlers) && $handlers[".$extension"] === $this->getModuleName()) {
+            if (array_key_exists(".$extension", $handlers) && $handlers[".$extension"]['name'] === $this->getModuleName()) {
 
                 // prepare the servlet path
                 if ($dirname === '/') {
