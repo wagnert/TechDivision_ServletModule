@@ -5,5 +5,5 @@ TechDivision_ServletModule
 
 What is TechDivision_ServletModule?
 -----------------
-TechDivision_ServletModule provides a module for the PHP based [WebServer](<https://github.com/techdivision/TechDivision_WebServer>) project to enable the usage of servlet classes as a web resource.
+TechDivision_ServletModule provides a module for the PHP based [Server](<https://github.com/techdivision/TechDivision_Server>) project to enable the usage of servlet classes as a web resource.
 
