@@ -36,11 +36,11 @@ use TechDivision\ServletEngine\Http\Request;
 use TechDivision\ServletEngine\Http\Response;
 use TechDivision\ServletEngine\Http\HttpRequestContext;
 use TechDivision\WebContainer\VirtualHost;
-use TechDivision\WebServer\Dictionaries\ModuleHooks;
-use TechDivision\WebServer\Dictionaries\ServerVars;
-use TechDivision\WebServer\Interfaces\ModuleInterface;
-use TechDivision\WebServer\Interfaces\ServerContextInterface;
-use TechDivision\WebServer\Exceptions\ModuleException;
+use TechDivision\Server\Dictionaries\ModuleHooks;
+use TechDivision\Server\Dictionaries\ServerVars;
+use TechDivision\Server\Interfaces\ModuleInterface;
+use TechDivision\Server\Interfaces\ServerContextInterface;
+use TechDivision\Server\Exceptions\ModuleException;
 use TechDivision\ApplicationServer\Api\AppService;
 use TechDivision\ApplicationServer\Api\ContainerService;
 use TechDivision\ApplicationServer\Api\Node\AppNode;
@@ -68,7 +68,7 @@ class ServletModule implements ModuleInterface
     /**
      * The server context instance.
      *
-     * @var \TechDivision\WebServer\Interfaces\ServerContextInterface
+     * @var \TechDivision\Server\Interfaces\ServerContextInterface
      */
     protected $serverContext;
 
@@ -109,10 +109,10 @@ class ServletModule implements ModuleInterface
     /**
      * Initializes the module.
      *
-     * @param \TechDivision\WebServer\Interfaces\ServerContextInterface $serverContext The servers context instance
+     * @param \TechDivision\Server\Interfaces\ServerContextInterface $serverContext The servers context instance
      *
      * @return void
-     * @throws \TechDivision\WebServer\Exceptions\ModuleException
+     * @throws \TechDivision\Server\Exceptions\ModuleException
      */
     public function init(ServerContextInterface $serverContext)
     {
@@ -211,7 +211,7 @@ class ServletModule implements ModuleInterface
      * @param int                                      $hook     The current hook to process logic for
      *
      * @return bool
-     * @throws \TechDivision\WebServer\Exceptions\ModuleException
+     * @throws \TechDivision\Server\Exceptions\ModuleException
      */
     public function process(HttpRequestInterface $request, HttpResponseInterface $response, $hook)
     {
@@ -369,7 +369,7 @@ class ServletModule implements ModuleInterface
     /**
      * Returns the server context instance.
      *
-     * @return \TechDivision\WebServer\Interfaces\ServerContextInterface The server context instance
+     * @return \TechDivision\Server\Interfaces\ServerContextInterface The server context instance
      */
     protected function getServerContext()
     {
