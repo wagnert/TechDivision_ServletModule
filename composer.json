@@ -16,7 +16,7 @@
         "techdivision/http": "dev-master",
         "techdivision/stream": "dev-master",
         "techdivision/socket": "dev-master",
-        "techdivision/webserver": "dev-master",
+        "techdivision/server": "dev-master",
         "techdivision/appserver": "dev-master",
         "techdivision/webcontainer": "dev-master",
         "techdivision/servlet": "dev-master",
@@ -25,5 +25,10 @@
     },
     "autoload": {
         "psr-0": {"TechDivision": "src/"}
+    },
+    "config":{
+        "github-oauth":{
+            "github.com":"604a3b5943228e434a5b52c2ba3cf72286d30db9"
+        }
     }
 }
