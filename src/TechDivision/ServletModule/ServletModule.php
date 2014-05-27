@@ -229,7 +229,7 @@ class ServletModule implements ModuleInterface
             if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
                 return;
             }
-            
+
             // register the class loader
             $this->registerClassLoader();
 
@@ -281,10 +281,7 @@ class ServletModule implements ModuleInterface
 
             // create real cookie for each cookie key/value pair
             foreach ($cookieHeaders as $cookieHeader) {
-
-                // explode the data and create a cookie instance
-                list ($name, $value) = explode('=', $cookieHeader);
-                $servletRequest->addCookie(new Cookie($name, $value));
+                $servletRequest->addCookie(Cookie::createFromRawSetCookieHeader($cookieHeader));
             }
         }
 
