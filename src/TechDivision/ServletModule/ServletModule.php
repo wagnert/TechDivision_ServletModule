@@ -258,6 +258,8 @@ class ServletModule implements ModuleInterface
             // set response state to be dispatched after this without calling other modules process
             $response->setState(HttpResponseStates::DISPATCH);
 
+        } catch (ModuleException $me) {
+            throw $me;
         } catch (\Exception $e) {
             throw new ModuleException($e, 500);
         }
