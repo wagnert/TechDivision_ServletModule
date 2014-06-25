@@ -29,7 +29,6 @@ use TechDivision\Servlet\Http\Cookie;
 use TechDivision\Servlet\ServletRequest;
 use TechDivision\ServletEngine\Engine;
 use TechDivision\ServletEngine\ServletValve;
-use TechDivision\ServletEngine\SessionValve;
 use TechDivision\ServletEngine\BadRequestException;
 use TechDivision\ServletEngine\Authentication\AuthenticationValve;
 use TechDivision\ServletEngine\Http\Session;
@@ -258,6 +257,8 @@ class ServletModule implements ModuleInterface
             // set response state to be dispatched after this without calling other modules process
             $response->setState(HttpResponseStates::DISPATCH);
 
+        } catch (ModuleException $me) {
+            throw $me;
         } catch (\Exception $e) {
             throw new ModuleException($e, 500);
         }
@@ -446,7 +447,6 @@ class ServletModule implements ModuleInterface
         $valves = new \SplObjectStorage();
         $valves->attach(new AuthenticationValve());
         $valves->attach(new ServletValve());
-        $valves->attach(new SessionValve());
         return $valves;
     }
 
