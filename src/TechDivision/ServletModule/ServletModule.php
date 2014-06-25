@@ -204,6 +204,17 @@ class ServletModule implements ModuleInterface
     }
 
     /**
+     * Prepares the module for upcoming request in specific context
+     *
+     * @return bool
+     * @throws \TechDivision\Server\Exceptions\ModuleException
+     */
+    public function prepare()
+    {
+        // todo: prepare application servlets for faster request processing in worker context
+    }
+
+    /**
      * Process the servlet engine.
      *
      * @param \TechDivision\Http\HttpRequestInterface  $request  The request object
