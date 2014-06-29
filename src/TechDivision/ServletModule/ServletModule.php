@@ -194,12 +194,12 @@ class ServletModule implements ModuleInterface
                     $application->addVirtualHost($virtualHost);
 
                     // add the application to the internal array
-                    $this->applications = array('/^' . $virtualHost->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application) + $this->applications;
+                    $this->applications = array('/^' . $virtualHost->getName() . '\/(([a-z0-9+\$_-]\.?)+)*\/?/' => $application) + $this->applications;
                 }
             }
 
             // finally APPEND a wildcard pattern for each application to the patterns array
-            $this->applications = $this->applications + array('/^[a-z0-9-.]*\/' . $application->getName() . '(\/([a-z0-9+\$_-]\.?)+)*\/?/' => $application);
+            $this->applications = $this->applications + array('/^[a-z0-9-.]*\/' . $application->getName() . '\/(([a-z0-9+\$_-]\.?)+)*\/?/' => $application);
         }
     }
 
