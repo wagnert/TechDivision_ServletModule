@@ -370,7 +370,7 @@ class ServletModule implements ModuleInterface
                 }
 
                 // inject the application context into the servlet request
-                $servletRequest->injectContext($application);
+                $servletRequest->injectRequestHandler(new RequestHandler($application));
 
                 // return, because request has been prepared successfully
                 return;
