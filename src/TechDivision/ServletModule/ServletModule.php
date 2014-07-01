@@ -260,9 +260,14 @@ class ServletModule implements ModuleInterface
             // let the servlet engine process the request
             $this->getEngine()->process($servletRequest, $servletResponse);
 
+            // append the content to the body stream
+            $response->appendBodyStream($servletResponse->getBodyStream());
+
             // transform the servlet response cookies into Http headers
             foreach ($servletResponse->getCookies() as $cookie) {
-                $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
+                if ($cookie instanceof Cookie) {
+                    $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
+                }
             }
 
             // set response state to be dispatched after this without calling other modules process
