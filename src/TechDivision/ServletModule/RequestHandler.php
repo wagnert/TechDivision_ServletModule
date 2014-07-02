@@ -120,15 +120,8 @@ class RequestHandler extends \Thread implements Context
         $servletRequest = $this->servletRequest;
         $servletResponse = $this->servletResponse;
 
-        // initialize the class loader with the additional folders
-        set_include_path(get_include_path() . PATH_SEPARATOR . $application->getWebappPath());
-        set_include_path(get_include_path() . PATH_SEPARATOR . $application->getWebappPath() . DIRECTORY_SEPARATOR . 'WEB-INF' . DIRECTORY_SEPARATOR . 'classes');
-        set_include_path(get_include_path() . PATH_SEPARATOR . $application->getWebappPath() . DIRECTORY_SEPARATOR . 'WEB-INF' . DIRECTORY_SEPARATOR . 'lib');
-
-        // register the class loader again, because in a Thread the context has been lost maybe
-        $application->getInitialContext()
-            ->getClassLoader()
-            ->register(true);
+        // register the class loader again, because each thread has its own context
+        $application->registerClassLoaders();
 
         // locate and service the servlet
         $application->getServletContext()
