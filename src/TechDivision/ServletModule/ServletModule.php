@@ -29,6 +29,7 @@ use TechDivision\Servlet\Http\Cookie;
 use TechDivision\Servlet\ServletRequest;
 use TechDivision\ServletEngine\Engine;
 use TechDivision\ServletEngine\ServletValve;
+use TechDivision\ServletEngine\RequestHandler;
 use TechDivision\ServletEngine\BadRequestException;
 use TechDivision\ServletEngine\Authentication\AuthenticationValve;
 use TechDivision\ServletEngine\Http\Session;
@@ -265,9 +266,7 @@ class ServletModule implements ModuleInterface
 
             // transform the servlet response cookies into Http headers
             foreach ($servletResponse->getCookies() as $cookie) {
-                if ($cookie instanceof Cookie) {
-                    $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
-                }
+                $response->addHeader(HttpProtocol::HEADER_SET_COOKIE, $cookie->__toString());
             }
 
             // set response state to be dispatched after this without calling other modules process
