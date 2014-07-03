@@ -25,7 +25,7 @@ use TechDivision\Http\HttpProtocol;
 use TechDivision\Http\HttpRequestInterface;
 use TechDivision\Http\HttpResponseInterface;
 use TechDivision\Http\HttpResponseStates;
-use TechDivision\Servlet\Http\Cookie;
+use TechDivision\Http\HttpCookie;
 use TechDivision\Servlet\ServletRequest;
 use TechDivision\ServletEngine\Engine;
 use TechDivision\ServletEngine\ServletValve;
@@ -294,7 +294,7 @@ class ServletModule implements ModuleInterface
 
             // create real cookie for each cookie key/value pair
             foreach ($cookieHeaders as $cookieHeader) {
-                $servletRequest->addCookie(Cookie::createFromRawSetCookieHeader($cookieHeader));
+                $servletRequest->addCookie(HttpCookie::createFromRawSetCookieHeader($cookieHeader));
             }
         }
 
