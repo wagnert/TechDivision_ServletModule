@@ -40,10 +40,13 @@ use TechDivision\Server\Dictionaries\ModuleHooks;
 use TechDivision\Server\Dictionaries\ServerVars;
 use TechDivision\Server\Interfaces\ModuleInterface;
 use TechDivision\Server\Interfaces\ServerContextInterface;
+use TechDivision\Server\Interfaces\RequestContextInterface;
 use TechDivision\Server\Exceptions\ModuleException;
 use TechDivision\ApplicationServer\Api\AppService;
 use TechDivision\ApplicationServer\Api\ContainerService;
 use TechDivision\ApplicationServer\Api\Node\AppNode;
+use TechDivision\Connection\ConnectionRequestInterface;
+use TechDivision\Connection\ConnectionResponseInterface;
 
 /**
  * This is a servlet module that handles a servlet request.
@@ -217,15 +220,26 @@ class ServletModule implements ModuleInterface
     /**
      * Process the servlet engine.
      *
-     * @param \TechDivision\Http\HttpRequestInterface  $request  The request object
-     * @param \TechDivision\Http\HttpResponseInterface $response The response object
-     * @param int                                      $hook     The current hook to process logic for
+     * @param \TechDivision\Connection\ConnectionRequestInterface     $request        A request object
+     * @param \TechDivision\Connection\ConnectionResponseInterface    $response       A response object
+     * @param \TechDivision\Server\Interfaces\RequestContextInterface $requestContext A requests context instance
+     * @param int                                                     $hook           The current hook to process logic for
      *
      * @return bool
      * @throws \TechDivision\Server\Exceptions\ModuleException
      */
-    public function process(HttpRequestInterface $request, HttpResponseInterface $response, $hook)
-    {
+    public function process(
+        ConnectionRequestInterface $request,
+        ConnectionResponseInterface $response,
+        RequestContextInterface $requestContext,
+        $hook
+    ) {
+
+        // In php an interface is, by definition, a fixed contract. It is immutable.
+        // So we have to declair the right ones afterwards...
+        /** @var $request \TechDivision\Http\HttpRequestInterface */
+        /** @var $request \TechDivision\Http\HttpResponseInterface */
+
         // if false hook is comming do nothing
         if (ModuleHooks::REQUEST_POST !== $hook) {
             return;
@@ -233,11 +247,8 @@ class ServletModule implements ModuleInterface
 
         try {
 
-            // make server context local
-            $serverContext = $this->getServerContext();
-
             // check if we are the handler that has to process this request
-            if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
+            if ($requestContext->getServerVar(ServerVars::SERVER_HANDLER) !== $this->getModuleName()) {
                 return;
             }
 
@@ -247,7 +258,7 @@ class ServletModule implements ModuleInterface
             // intialize servlet session, request + response
             $servletRequest = new Request();
             $servletRequest->injectHttpRequest($request);
-            $servletRequest->injectServerVars($serverContext->getServerVars());
+            $servletRequest->injectServerVars($requestContext->getServerVars());
 
             // prepare the servlet request
             $this->prepareServletRequest($servletRequest);
